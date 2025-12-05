@@ -38,28 +38,9 @@ class DB:
         if self.connection:
             self.connection.close()
 
-    def create_tables(self, enable_vector: bool = True):
-        """创建数据库表
-        
-        Args:
-            enable_vector: 是否启用pgvector扩展。如果为False，embedding列将使用TEXT类型
-        """
-        # 尝试创建vector扩展，如果失败则使用TEXT类型
-        vector_type = "VECTOR(1536)" if enable_vector else "TEXT"
-        
-        if enable_vector:
-            try:
-                with self.connection.cursor() as cur:
-                    cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-                self.connection.commit()
-                logger.info("pgvector扩展已启用")
-            except Exception as e:
-                logger.warning(f"pgvector扩展启用失败，将使用TEXT类型: {e}")
-                vector_type = "TEXT"
-                enable_vector = False
-                self.connection.rollback()
-        
-        create_query = f"""
+    def create_tables(self):
+        create_query = """
+        CREATE EXTENSION IF NOT EXISTS vector;
 
         CREATE TABLE IF NOT EXISTS framework (
             id                      SERIAL PRIMARY KEY,
@@ -93,8 +74,7 @@ class DB:
             id                      SERIAL PRIMARY KEY,
             question_source_id      INT NOT NULL REFERENCES question_source(id) ON DELETE CASCADE,
             framework_id            INT NOT NULL REFERENCES framework(id),
-            embedding               {vector_type} NOT NULL,
-            metadata                JSONB,
+            embedding               VECTOR(1536),
             CONSTRAINT unique_question UNIQUE(question_source_id, framework_id)
         );
 
@@ -106,30 +86,15 @@ class DB:
             CONSTRAINT unique_question_element UNIQUE(question_id, framework_element_id)
         );
 
+        CREATE INDEX IF NOT EXISTS idx_question_embedding_vector 
+        ON question USING ivfflat (embedding vector_cosine_ops) 
+        WITH (lists = 100);
         """
-        
         with self.connection.cursor() as cur:
             cur.execute(create_query)
-        
-        # 只有在启用vector时才创建向量索引
-        if enable_vector:
-            try:
-                with self.connection.cursor() as cur:
-                    cur.execute("""
-                        CREATE INDEX IF NOT EXISTS idx_question_embedding_vector 
-                        ON question USING ivfflat (embedding vector_cosine_ops) 
-                        WITH (lists = 100);
-                    """)
-                logger.info("向量索引创建成功")
-            except Exception as e:
-                logger.warning(f"向量索引创建失败: {e}")
-                self.connection.rollback()
-        
-        self.connection.commit()
-        logger.info("数据表创建成功")
+        self.commit()
 
     def drop_tables(self):
-        """删除所有表"""
         tables = [
             'question_elements',
             'question',
@@ -140,7 +105,7 @@ class DB:
         with self.connection.cursor() as cur:
             for table in tables:
                 cur.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
-        self.connection.commit()
+        self.commit()
         logger.info("所有数据表已删除")
 
     def initialize_default_frameworks(self) -> None:
@@ -217,19 +182,17 @@ class DB:
 
                 for element in framework['elements']:
                     cur.execute(insert_framework_element_query, (framework_id, element['label'], element['order'], element['description']))  
-        self.connection.commit()
-        logger.info("默认框架初始化成功")
+        self.commit()
 
     def get_all_frameworks(self) -> List[Dict]:
-        """获取所有框架"""
         search_query = "SELECT * FROM framework ORDER BY id"
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query)
             result = cur.fetchall()
+        self.commit()
         return [dict(row) for row in result] if result else []
 
     def get_framework_elements(self, framework_id: int) -> List[Dict]:
-        """ 获取框架元素"""
         search_query = """
                     SELECT * FROM framework_elements 
                     WHERE framework_id = %s
@@ -238,10 +201,10 @@ class DB:
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (framework_id,))
             result = cur.fetchall()
+        self.commit()
         return [dict(row) for row in result] if result else []
 
     def get_framework_element_by_label(self, framework_label: str, element_label: str) -> Optional[Dict]:
-        """根据标签获取框架元素"""
         search_query = """
                     SELECT fe.* 
                     FROM framework_elements fe
@@ -251,18 +214,18 @@ class DB:
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (framework_label, element_label))
             row = cur.fetchone()
+        self.commit()
         return dict(row) if row else None
 
     def get_framework_by_label(self, label: str) -> Optional[Dict]:
-        """根据标签获取框架"""
         search_query = "SELECT * FROM framework WHERE label = %s"
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (label,))
             row = cur.fetchone()
+        self.commit()
         return dict(row) if row else None
     
     def insert_question_source(self, source_label: str, research_type: str, grade: str, title: str, abstract: str, source_id: Optional[str] = None) -> Optional[int]:
-        """插入问题来源"""
         insert_query = """
                     INSERT INTO question_source 
                     (source_label, source_id, research_type, grade, title, abstract)
@@ -273,53 +236,56 @@ class DB:
         with self.connection.cursor() as cur:
             cur.execute(insert_query, (source_label, source_id, research_type, grade, title, abstract))
             result = cur.fetchone()
-        self.connection.commit()
+        self.commit()
         return result[0] if result else None
 
     def get_question_source_by_id(self, question_source_id: int) -> Optional[Dict]:
-        """根据ID获取问题来源"""
         search_query = "SELECT * FROM question_source WHERE id = %s"
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (question_source_id,))
             row = cur.fetchone()
+        self.commit()
         return dict(row) if row else None
 
     def get_question_source_by_title(self, source_label: str, title: str) -> Optional[Dict]:
-        """根据标题获取问题来源"""
         search_query = "SELECT * FROM question_source WHERE source_label = %s AND title = %s"
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (source_label, title))
             row = cur.fetchone()
+        self.commit()
         return dict(row) if row else None
     
     def insert_question(self, question_source_id: int, framework_id: int, embedding: Optional[List[float]] = None) -> Optional[int]:
-        """插入问题"""
         insert_query = """
                 INSERT INTO question 
                 (question_source_id, framework_id, embedding)
-                VALUES (%s, %s, %s)
+                VALUES (%s, %s, null)
                 ON CONFLICT (question_source_id, framework_id) DO NOTHING
                 RETURNING id
                 """
-        # 如果embedding为list，转换为JSON字符串存储
-        embedding_str = str(embedding) if embedding else None
-        
         with self.connection.cursor() as cur:
-            cur.execute(insert_query, (question_source_id, framework_id, embedding_str))
-            result = cur.fetchone()
-        self.connection.commit()
-        return result[0] if result else None
+            cur.execute(insert_query, (question_source_id, framework_id))
+            result = cur.fetchone()[0]
+        if embedding is not None:
+            update_query = """
+                UPDATE question 
+                SET embedding = %s
+                WHERE id = %s
+                """
+            with self.connection.cursor() as cur:
+                cur.execute(update_query, (embedding, result))
+        self.commit()
+        return result if result else None
 
     def get_question_by_id(self, question_source_id: int) -> Optional[List[Dict]]:
-        """根据ID获取问题"""
         search_query = "SELECT * FROM question WHERE question_source_id = %s"
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (question_source_id,))
             result = cur.fetchall()
+        self.commit()
         return [dict(row) for row in result] if result else None
 
     def insert_question_element(self, question_id: int, framework_element_id: int, question_element_label: str) -> None:
-        """插入问题元素"""
         insert_query = """
                     INSERT INTO question_elements 
                     (question_id, framework_element_id, question_element_label)
@@ -331,7 +297,7 @@ class DB:
         with self.connection.cursor() as cur:
             cur.execute(insert_query, (question_id, framework_element_id, question_element_label))
             result = cur.fetchone()
-        self.connection.commit()
+        self.commit()
         return result[0] if result else None
 
     def get_question_elements_by_question_id(self, question_id: int) -> Optional[List[Dict]]:
@@ -348,6 +314,7 @@ class DB:
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (question_id,))
             result = cur.fetchall()
+        self.commit()
         return [dict(row) for row in result] if result else None
 
     def get_statistics(self) -> Dict:
@@ -382,4 +349,5 @@ class DB:
             )
             stats['by_framework'] = {row['label']: row['count'] for row in cur.fetchall()}
             
+        self.commit()
         return stats

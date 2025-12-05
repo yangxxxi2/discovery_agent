@@ -13,20 +13,20 @@ db = DB()
 
 class TestDB:
 
-    def test_reset_db():
+    def test_reset_db(self):
         print(f"数据库配置: {db.config}")
         db.reset_db()
     
-    def test_get_frameworks_and_elements():
+    def test_get_frameworks_and_elements(self):
         frameworks = db.get_all_frameworks()
         print("已加载的框架:")
         for fw in frameworks:
-            print(f"- {fw['label']}: {fw['description']}")
+            print(f"- {fw['label']}: {fw ['description']}")
             elements = db.get_framework_elements(fw['id'])
             for elem in elements:
                 print(f"  [{elem['label']}] {elem['description']}")
 
-    def test_insert_question_source():
+    def test_insert_question_source(self):
         db.insert_question_source(
             source_label='PubMed',
             source_id='PMID12345678',
@@ -36,7 +36,7 @@ class TestDB:
             abstract='This randomized controlled trial investigated the effect of intervention X...'
         )
     
-    def test_get_question_source():
+    def test_get_question_source(self):
         db.insert_question_source(
             source_label='ClinicalTrials.gov',
             source_id='ased1',
@@ -48,7 +48,7 @@ class TestDB:
         source = db.get_question_source_by_title('ClinicalTrials.gov', 'aaaa')
         print(source)
 
-    def test_insert_question():
+    def test_insert_question(self):
         import numpy as np
         question_source = db.get_question_source_by_title('ClinicalTrials.gov', 'aaaa')
         framework1 = db.get_framework_by_label('PICO')
@@ -66,7 +66,7 @@ class TestDB:
                 framework_id=framework2['id']
             )
 
-    def test_insert_question_element():
+    def test_insert_question_element(self):
         pico_framework = db.get_framework_by_label('PICO')
         pico_elements = db.get_framework_elements(pico_framework['id'])
         pico_values = {
@@ -84,13 +84,13 @@ class TestDB:
                     question_element_label=pico_values[element['label']]
                 )
 
-    def test_get_question_elements_by_question_id():
+    def test_get_question_elements_by_question_id(self):
         question_elements = db.get_question_elements_by_question_id(1)
         print("Question Elements for Question ID 1:")
         for elem in question_elements:
             print(f"- [{elem['question_element_label']}]")
 
-    def test_get_statistics():
+    def test_get_statistics(self):
         stats = db.get_statistics()
         print("数据库统计信息:")
         for key, value in stats.items():
@@ -99,10 +99,10 @@ class TestDB:
 if __name__ == "__main__":
     test_db = TestDB()
     test_db.test_reset_db()
-    # test_db.test_get_frameworks_and_elements()
-    # test_db.test_insert_question_source()
-    # test_db.test_get_question_source()
-    # test_db.test_insert_question()
-    # test_db.test_insert_question_element()
-    # test_db.test_get_question_elements_by_question_id()
-    # test_db.test_get_statistics()
+    test_db.test_get_frameworks_and_elements()
+    test_db.test_insert_question_source()
+    test_db.test_get_question_source()
+    test_db.test_insert_question()
+    test_db.test_insert_question_element()
+    test_db.test_get_question_elements_by_question_id()
+    test_db.test_get_statistics()
