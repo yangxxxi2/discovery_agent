@@ -47,6 +47,7 @@ class DB:
             label                   VARCHAR(50) UNIQUE NOT NULL,
             supported_research_type VARCHAR(100) NOT NULL,
             description             TEXT,
+            example                 TEXT,
             CONSTRAINT unique_framework UNIQUE(label)
         );
 
@@ -64,7 +65,8 @@ class DB:
             source_label            VARCHAR(50) NOT NULL,
             source_id               VARCHAR(100),
             research_type           VARCHAR(100) NOT NULL,
-            grade                   VARCHAR(50) NOT NULL,
+            grade_level             VARCHAR(50),
+            ocebm_2011_level        VARCHAR(50),
             title                   TEXT NOT NULL,
             abstract                TEXT NOT NULL,
             CONSTRAINT unique_source UNIQUE(source_label, title)
@@ -110,8 +112,8 @@ class DB:
 
     def initialize_default_frameworks(self) -> None:
         insert_framework_query = """
-                        INSERT INTO framework (label, supported_research_type, description)
-                        VALUES (%s, %s, %s)
+                        INSERT INTO framework (label, supported_research_type, description, example)
+                        VALUES (%s, %s, %s, %s)
                         ON CONFLICT (label) DO NOTHING
                         RETURNING id
                         """
@@ -123,9 +125,23 @@ class DB:
         search_framework_query = "SELECT id FROM framework WHERE label = %s"
         frameworks = [
             {
+                'label': 'PICOT',
+                'supported_research_type': 'interventional study',
+                'description': '干预与结局关联分析',
+                'example': '(1)在绝经后骨质疏松女性群体中，接受地诺单抗治疗相比安慰剂，在24个月内，是否能降低椎体骨折发生率;',
+                'elements': [
+                    {'label': 'P', 'order': 1, 'description': 'Population - 研究人群'},
+                    {'label': 'I', 'order': 2, 'description': 'Intervention - 干预措施'},
+                    {'label': 'C', 'order': 3, 'description': 'Comparison - 对照组'},
+                    {'label': 'O', 'order': 4, 'description': 'Outcome - 结局指标'},
+                    {'label': 'T', 'order': 5, 'description': 'Timeframe - 时间'}
+                ]
+            },
+            {
                 'label': 'PICO',
-                'supported_research_type': 'Randomized Controlled Trials',
-                'description': 'Patient/Population, Intervention, Comparison, Outcome',
+                'supported_research_type': 'interventional study without timeframe',
+                'description': '干预与结局关联分析，没有时间维度',
+                'example': '(1)在2型糖尿病成人群体中，相比单独运动管理，GLP-1受体激动剂治疗是否能改善HbA1c并减少体重;',
                 'elements': [
                     {'label': 'P', 'order': 1, 'description': 'Population - 研究人群'},
                     {'label': 'I', 'order': 2, 'description': 'Intervention - 干预措施'},
@@ -134,41 +150,98 @@ class DB:
                 ]
             },
             {
+                'label': 'PEO',
+                'supported_research_type': 'observational study without comparison',
+                'description': '暴露与结局关联分析，没有对照组',
+                'example': '(1)在暴露于二手烟的儿童群体中，哮喘发生率是否增加;(2)孕妇孕期生活在空气污染环境中与早产发生是否相关;',
+                'elements': [
+                    {'label': 'P', 'order': 1, 'description': 'Population - 研究人群'},
+                    {'label': 'E', 'order': 2, 'description': 'Exposure - 暴露因素'},
+                    {'label': 'O', 'order': 3, 'description': 'Outcome - 结局指标'}
+                ]
+            },
+            {
+                'label': 'PECO',
+                'supported_research_type': 'observational study',
+                'description': '暴露与结局关联分析',
+                'example': '(1) 在吸烟成人群体中，相比不吸烟者，冠心病发生率是否增加;(2)孕妇孕期暴露于高浓度空气污染环境中，与低出生体重发生是否相关;',
+                'elements': [
+                    {'label': 'P', 'order': 1, 'description': 'Population - 研究人群'},
+                    {'label': 'E', 'order': 2, 'description': 'Exposure - 暴露因素'},
+                    {'label': 'C', 'order': 3, 'description': 'Comparison - 对照组'},
+                    {'label': 'O', 'order': 4, 'description': 'Outcome - 结局指标'}
+                ]
+            },
+            {
+                'label': 'CoCoPop',
+                'supported_research_type': 'prevalence study',
+                'description': '患病率描述性分析',
+                'example': '(1)在40-70岁社区居民中，城市社区基层卫生服务中心体检环境下的高血压的患病率;'+
+                           '(2)高中学生群体中抑郁症状在学校环境下的发生率;'+
+                           '(3)在ICU住院患者中，医院获得性感染在重症监护环境下的发生率/患病率是多少',
+                'elements': [
+                    {'label': 'Co', 'order': 1, 'description': 'Condition - 疾病/健康问题'},
+                    {'label': 'Co', 'order': 2, 'description': 'Context - 研究背景/场所/地区'},
+                    {'label': 'P', 'order': 3, 'description': 'Population - 研究人群'}
+                ]
+            },
+            {
+                'label': 'PIRD',
+                'supported_research_type': 'diagnostic test accuracy study',
+                'description': '诊断方法准确性评价',
+                'example': '(1)高敏肌钙蛋白T（hs-cTnT）的0/1小时算法与冠脉造影方法相比，在诊断急诊胸痛成人患者的急性心肌梗死的表现;'+
+                           '(2)超声弹性成像技术与肝活检方法相比，在诊断慢性肝病患者肝纤维化程度的准确性;'+
+                           '(3)在疑似乳腺癌的女性中，乳腺MRI相比术后病理诊断，在诊断乳腺恶性肿瘤的准确性;',
+                'elements': [
+                    {'label': 'P', 'order': 1, 'description': 'Population - 研究人群'},
+                    {'label': 'I', 'order': 2, 'description': 'Index test - 诊断方法'},
+                    {'label': 'R', 'order': 3, 'description': 'Reference test - 金标准方法'},
+                    {'label': 'D', 'order': 4, 'description': 'Diagnosis of interest - 诊断目标'}
+                ]
+            },
+            {
                 'label': 'SPIDER',
-                'supported_research_type': 'Qualitative Research',
-                'description': 'Sample, Phenomenon of Interest, Design, Evaluation, Research type',
+                'supported_research_type': 'qualitative study',
+                'description': '患者体验感受、医生观点、医生经验等访谈/观察类质性研究',
+                'example': '(1)开展一项定性研究（r），对接受髋关节置换术的老年患者（s）进行半结构式访谈（d），主题分析患者对术后疼痛管理（pi）的体验感受（e）;' +
+                           '(2)探索2型糖尿病患者是如何体验与理解日常血糖自我管理行为，采用半结构式访谈收集他们对自我管理挑战与促进因素的看法，深入了解其主观体验;',
                 'elements': [
                     {'label': 'S', 'order': 1, 'description': 'Sample - 样本/研究对象'},
                     {'label': 'PI', 'order': 2, 'description': 'Phenomenon of Interest - 关注现象'},
                     {'label': 'D', 'order': 3, 'description': 'Design - 研究设计'},
-                    {'label': 'E', 'order': 4, 'description': 'Evaluation - 评估/结果'},
+                    {'label': 'E', 'order': 4, 'description': 'Evaluation - 评估'},
                     {'label': 'R', 'order': 5, 'description': 'Research type - 研究类型'}
                 ]
             },
-            # {
-            #     'label': 'PICOC',
-            #     'supported_research_type': 'Software Engineering',
-            #     'description': 'Population, Intervention, Comparison, Outcome, Context',
-            #     'elements': [
-            #         {'label': 'P', 'order': 1, 'description': 'Population - 研究对象'},
-            #         {'label': 'I', 'order': 2, 'description': 'Intervention - 干预措施'},
-            #         {'label': 'C', 'order': 3, 'description': 'Comparison - 对照'},
-            #         {'label': 'O', 'order': 4, 'description': 'Outcome - 结果'},
-            #         {'label': 'C', 'order': 5, 'description': 'Context - 上下文'}
-            #     ]
-            # },
-            # {
-            #     'label': 'SPICE',
-            #     'supported_research_type': 'Mixed Methods Research',
-            #     'description': 'Setting, Perspective, Intervention, Comparison, Evaluation',
-            #     'elements': [
-            #         {'label': 'S', 'order': 1, 'description': 'Setting - 研究背景'},
-            #         {'label': 'P', 'order': 2, 'description': 'Perspective - 研究视角'},
-            #         {'label': 'I', 'order': 3, 'description': 'Intervention - 干预'},
-            #         {'label': 'C', 'order': 4, 'description': 'Comparison - 比较'},
-            #         {'label': 'E', 'order': 5, 'description': 'Evaluation - 评估'}
-            #     ]
-            # }
+            {
+                'label': 'SPICE',
+                'supported_research_type': 'health practice study',
+                'description': '教育、护理流程、随访模式等实践评价（服务质量、满意度、依从性、流程效率等）研究，',
+                'example': '(1)在急诊科环境中（s），对于成人急诊患者（p），实施快速评估与分诊流程（i）相比传统护理流程（c），能否提高患者满意度和缩短等待时间（e）;'+
+                           '(2)在社区卫生服务中心环境中，对于2型糖尿病患者，实施个体化健康教育干预相比常规健康教育，能否改善患者的血糖控制和生活质量;'+
+                           '(3)在三级医院风湿免疫科，对于系统性红斑狼疮患者，实施护士主导的疾病管理门诊，相比传统医生门诊随访，能否改善疾病活动度控制与复诊依从性;',
+                'elements': [
+                    {'label': 'S', 'order': 1, 'description': 'Setting - 环境'},
+                    {'label': 'P', 'order': 2, 'description': 'Perspective - 对象'},
+                    {'label': 'I', 'order': 3, 'description': 'Intervention - 干预'},
+                    {'label': 'C', 'order': 4, 'description': 'Comparison - 对照'},
+                    {'label': 'E', 'order': 5, 'description': 'Evaluation - 评估'}
+                ]
+            },
+            {
+                'label': 'ECLIPSe',
+                'supported_research_type': 'health service study',
+                'description': '卫生服务体系、卫生服务政策研究',
+                'example': '(1)在社区卫生服务中心中(l),为提高2型糖尿病患者(c)的慢病管理质量(e)，由全科医生与护士团队(p)实施多学科管理模式(se)，以改善血糖控制率并加强并发症监测(i)',
+                'elements': [
+                    {'label': 'E', 'order': 1, 'description': 'Exceptation(improvement, innovation or information) - 期望'},
+                    {'label': 'C', 'order': 2, 'description': 'Client group (recipients of service) - 服务对象'},
+                    {'label': 'L', 'order': 3, 'description': 'Location (where service is housed) - 地点'},
+                    {'label': 'I', 'order': 4, 'description': 'Impact (change in service and how measured) - 影响'},
+                    {'label': 'P', 'order': 5, 'description': 'Professionals - 专业人员'},
+                    {'label': 'Se', 'order': 6, 'description': 'Services - 服务'}
+                ]
+            }
         ]
         with self.connection.cursor() as cur:
             for framework in frameworks:
