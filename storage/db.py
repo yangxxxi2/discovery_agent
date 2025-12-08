@@ -3,7 +3,26 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import logging
 from typing import List, Dict, Optional
-
+from ..constants import (
+    QUESTION_TYPE_INTEVENTION_TIME,
+    QUESTION_TYPE_INTEVENTION,
+    QUESTION_TYPE_OBSERVATION_TIME,
+    QUESTION_TYPE_OBSERVATION,
+    QUESTION_TYPE_PREVALENCE,
+    QUESTION_TYPE_DIAGNOSIS,
+    QUESTION_TYPE_QUALITATION,
+    QUESTION_TYPE_HEALTH_PRACTICE,
+    QUESTION_TYPE_HEALTH_SERVICE,
+    QUESTION_MODEL_PICO,
+    QUESTION_MODEL_PICOT,
+    QUESTION_MODEL_PECO,
+    QUESTION_MODEL_PEO,
+    QUESTION_MODEL_CoCoPop,
+    QUESTION_MODEL_PIRD,
+    QUESTION_MODEL_SPIDER,
+    QUESTION_MODEL_SPICE,
+    QUESTION_MODEL_ECLIPSe,
+)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -45,7 +64,7 @@ class DB:
         CREATE TABLE IF NOT EXISTS framework (
             id                      SERIAL PRIMARY KEY,
             label                   VARCHAR(50) UNIQUE NOT NULL,
-            supported_research_type VARCHAR(100) NOT NULL,
+            question_type           VARCHAR(100) NOT NULL,
             description             TEXT,
             example                 TEXT,
             CONSTRAINT unique_framework UNIQUE(label)
@@ -65,6 +84,7 @@ class DB:
             source_label            VARCHAR(50) NOT NULL,
             source_id               VARCHAR(100),
             research_type           VARCHAR(100) NOT NULL,
+            question_type           VARCHAR(100) NOT NULL,
             grade_level             VARCHAR(50),
             ocebm_2011_level        VARCHAR(50),
             title                   TEXT NOT NULL,
@@ -112,7 +132,7 @@ class DB:
 
     def initialize_default_frameworks(self) -> None:
         insert_framework_query = """
-                        INSERT INTO framework (label, supported_research_type, description, example)
+                        INSERT INTO framework (label, question_type, description, example)
                         VALUES (%s, %s, %s, %s)
                         ON CONFLICT (label) DO NOTHING
                         RETURNING id
@@ -125,9 +145,9 @@ class DB:
         search_framework_query = "SELECT id FROM framework WHERE label = %s"
         frameworks = [
             {
-                'label': 'PICOT',
-                'supported_research_type': 'interventional study',
-                'description': '干预与结局关联分析',
+                'label': QUESTION_MODEL_PICOT,
+                'question_type': QUESTION_TYPE_INTEVENTION_TIME,
+                'description': '干预与结局关联分析，有时间维度',
                 'example': '(1)在绝经后骨质疏松女性群体中，接受地诺单抗治疗相比安慰剂，在24个月内，是否能降低椎体骨折发生率;',
                 'elements': [
                     {'label': 'P', 'order': 1, 'description': 'Population - 研究人群'},
@@ -138,8 +158,8 @@ class DB:
                 ]
             },
             {
-                'label': 'PICO',
-                'supported_research_type': 'interventional study without timeframe',
+                'label': QUESTION_MODEL_PICO,
+                'question_type': QUESTION_TYPE_INTEVENTION,
                 'description': '干预与结局关联分析，没有时间维度',
                 'example': '(1)在2型糖尿病成人群体中，相比单独运动管理，GLP-1受体激动剂治疗是否能改善HbA1c并减少体重;',
                 'elements': [
@@ -150,8 +170,8 @@ class DB:
                 ]
             },
             {
-                'label': 'PEO',
-                'supported_research_type': 'observational study without comparison',
+                'label': QUESTION_MODEL_PEO,
+                'question_type': QUESTION_TYPE_OBSERVATION,
                 'description': '暴露与结局关联分析，没有对照组',
                 'example': '(1)在暴露于二手烟的儿童群体中，哮喘发生率是否增加;(2)孕妇孕期生活在空气污染环境中与早产发生是否相关;',
                 'elements': [
@@ -161,9 +181,9 @@ class DB:
                 ]
             },
             {
-                'label': 'PECO',
-                'supported_research_type': 'observational study',
-                'description': '暴露与结局关联分析',
+                'label': QUESTION_MODEL_PECO,
+                'question_type': QUESTION_TYPE_OBSERVATION_TIME,
+                'description': '暴露与结局关联分析，有对照组',
                 'example': '(1) 在吸烟成人群体中，相比不吸烟者，冠心病发生率是否增加;(2)孕妇孕期暴露于高浓度空气污染环境中，与低出生体重发生是否相关;',
                 'elements': [
                     {'label': 'P', 'order': 1, 'description': 'Population - 研究人群'},
@@ -173,9 +193,9 @@ class DB:
                 ]
             },
             {
-                'label': 'CoCoPop',
-                'supported_research_type': 'prevalence study',
-                'description': '患病率描述性分析',
+                'label': QUESTION_MODEL_CoCoPop,
+                'question_type': QUESTION_TYPE_PREVALENCE,
+                'description': '发病率/患病率的描述性分析；人群层面暴露与结局关联分析',
                 'example': '(1)在40-70岁社区居民中，城市社区基层卫生服务中心体检环境下的高血压的患病率;'+
                            '(2)高中学生群体中抑郁症状在学校环境下的发生率;'+
                            '(3)在ICU住院患者中，医院获得性感染在重症监护环境下的发生率/患病率是多少',
@@ -186,8 +206,8 @@ class DB:
                 ]
             },
             {
-                'label': 'PIRD',
-                'supported_research_type': 'diagnostic test accuracy study',
+                'label': QUESTION_MODEL_PIRD,
+                'question_type': QUESTION_TYPE_DIAGNOSIS,
                 'description': '诊断方法准确性评价',
                 'example': '(1)高敏肌钙蛋白T（hs-cTnT）的0/1小时算法与冠脉造影方法相比，在诊断急诊胸痛成人患者的急性心肌梗死的表现;'+
                            '(2)超声弹性成像技术与肝活检方法相比，在诊断慢性肝病患者肝纤维化程度的准确性;'+
@@ -200,9 +220,9 @@ class DB:
                 ]
             },
             {
-                'label': 'SPIDER',
-                'supported_research_type': 'qualitative study',
-                'description': '患者体验感受、医生观点、医生经验等访谈/观察类质性研究',
+                'label': QUESTION_MODEL_SPIDER,
+                'question_type': QUESTION_TYPE_QUALITATION,
+                'description': '关注患者体验感受、医生观点、医生经验等访谈/观察类质性研究，其目的在于探索现象本质，理解主观体验',
                 'example': '(1)开展一项定性研究（r），对接受髋关节置换术的老年患者（s）进行半结构式访谈（d），主题分析患者对术后疼痛管理（pi）的体验感受（e）;' +
                            '(2)探索2型糖尿病患者是如何体验与理解日常血糖自我管理行为，采用半结构式访谈收集他们对自我管理挑战与促进因素的看法，深入了解其主观体验;',
                 'elements': [
@@ -214,9 +234,9 @@ class DB:
                 ]
             },
             {
-                'label': 'SPICE',
-                'supported_research_type': 'health practice study',
-                'description': '教育、护理流程、随访模式等实践评价（服务质量、满意度、依从性、流程效率等）研究，',
+                'label': QUESTION_MODEL_SPICE,
+                'question_type': QUESTION_TYPE_HEALTH_PRACTICE,
+                'description': '聚焦医疗健康领域实践服务的应用型研究，其目的在于评估、优化健康实践服务，提升医疗质量、患者结局与资源利用率，例如教育、护理流程、随访模式的实践评价（服务质量、满意度、依从性、流程效率等）',
                 'example': '(1)在急诊科环境中（s），对于成人急诊患者（p），实施快速评估与分诊流程（i）相比传统护理流程（c），能否提高患者满意度和缩短等待时间（e）;'+
                            '(2)在社区卫生服务中心环境中，对于2型糖尿病患者，实施个体化健康教育干预相比常规健康教育，能否改善患者的血糖控制和生活质量;'+
                            '(3)在三级医院风湿免疫科，对于系统性红斑狼疮患者，实施护士主导的疾病管理门诊，相比传统医生门诊随访，能否改善疾病活动度控制与复诊依从性;',
@@ -229,9 +249,9 @@ class DB:
                 ]
             },
             {
-                'label': 'ECLIPSe',
-                'supported_research_type': 'health service study',
-                'description': '卫生服务体系、卫生服务政策研究',
+                'label': QUESTION_MODEL_ECLIPSe,
+                'question_type': QUESTION_TYPE_HEALTH_SERVICE,
+                'description': '聚焦卫生服务体系、功能、政策的交叉学科研究，其目的在于分析卫生服务的供给、需求、利用与分配，优化资源配置、完善卫生政策、提高公平性与可及性',
                 'example': '(1)在社区卫生服务中心中(l),为提高2型糖尿病患者(c)的慢病管理质量(e)，由全科医生与护士团队(p)实施多学科管理模式(se)，以改善血糖控制率并加强并发症监测(i)',
                 'elements': [
                     {'label': 'E', 'order': 1, 'description': 'Exceptation(improvement, innovation or information) - 期望'},
