@@ -1,3 +1,14 @@
+#任务类型
+TASK_TYPE_INTEVENTION_TIME = 'Interventional Question with Time Dimension'
+TASK_TYPE_INTEVENTION = 'Interventional Question without Time Dimension'
+TASK_TYPE_OBSERVATION_TIME = 'Observational Question with Comparison'
+TASK_TYPE_OBSERVATION = 'Observational Question without Comparison'
+TASK_TYPE_PREVALENCE = 'Prevalence / Incidence Question'
+TASK_TYPE_DIAGNOSIS = 'Diagnostic Test Accuracy Question'
+TASK_TYPE_QUALITATION = 'Qualitative Question'
+TASK_TYPE_HEALTH_PRACTICE = 'Health Practice Question'
+TASK_TYPE_HEALTH_SERVICE = 'Health Service Question'
+
 #问题模型
 QUESTION_MODEL_PICO = 'PICO'
 QUESTION_MODEL_PICOT = 'PICOT'
@@ -8,17 +19,6 @@ QUESTION_MODEL_PIRD = 'PIRD'
 QUESTION_MODEL_SPIDER = 'SPIDER'
 QUESTION_MODEL_SPICE = 'SPICE'
 QUESTION_MODEL_ECLIPSe = 'ECLIPSe'
-
-#问题类型
-QUESTION_TYPE_INTEVENTION_TIME = 'Interventional Question with Time Dimension'
-QUESTION_TYPE_INTEVENTION = 'Interventional Question without Time Dimension'
-QUESTION_TYPE_OBSERVATION_TIME = 'Observational Question with Comparison'
-QUESTION_TYPE_OBSERVATION = 'Observational Question without Comparison'
-QUESTION_TYPE_PREVALENCE = 'Prevalence / Incidence Question'
-QUESTION_TYPE_DIAGNOSIS = 'Diagnostic Test Accuracy Question'
-QUESTION_TYPE_QUALITATION = 'Qualitative Question'
-QUESTION_TYPE_HEALTH_PRACTICE = 'Health Practice Question'
-QUESTION_TYPE_HEALTH_SERVICE = 'Health Service Question'
 
 #研究设计类型
 RESEARCH_TYPE_COHORT = 'Cohort Study'
