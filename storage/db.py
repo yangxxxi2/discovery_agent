@@ -6,7 +6,7 @@ from typing import List, Dict, Optional
 from ..constants import (
     TASK_TYPE_INTEVENTION_TIME,
     TASK_TYPE_INTEVENTION,
-    TASK_TYPE_OBSERVATION_TIME,
+    TASK_TYPE_OBSERVATION_COMPARISON,
     TASK_TYPE_OBSERVATION,
     TASK_TYPE_PREVALENCE,
     TASK_TYPE_DIAGNOSIS,
@@ -43,6 +43,8 @@ class DB:
         self.drop_tables()
         self.create_tables()
         self.initialize_default_frameworks()
+        self.commit()
+        self.close()
     
     def commit(self):
         try:
@@ -84,7 +86,7 @@ class DB:
             source_label            VARCHAR(50) NOT NULL,
             source_id               VARCHAR(100),
             research_type           VARCHAR(100) NOT NULL,
-            task_type           VARCHAR(100) NOT NULL,
+            task_type               VARCHAR(100) NOT NULL,
             grade_level             VARCHAR(50),
             ocebm_2011_level        VARCHAR(50),
             title                   TEXT NOT NULL,
@@ -96,7 +98,7 @@ class DB:
             id                      SERIAL PRIMARY KEY,
             question_source_id      INT NOT NULL REFERENCES question_source(id) ON DELETE CASCADE,
             framework_id            INT NOT NULL REFERENCES framework(id),
-            embedding               VECTOR(1536),
+            embedding               VECTOR(1024),
             CONSTRAINT unique_question UNIQUE(question_source_id, framework_id)
         );
 
@@ -114,7 +116,6 @@ class DB:
         """
         with self.connection.cursor() as cur:
             cur.execute(create_query)
-        self.commit()
 
     def drop_tables(self):
         tables = [
@@ -127,7 +128,6 @@ class DB:
         with self.connection.cursor() as cur:
             for table in tables:
                 cur.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
-        self.commit()
         logger.info("所有数据表已删除")
 
     def initialize_default_frameworks(self) -> None:
@@ -183,7 +183,7 @@ class DB:
             },
             {
                 'label': QUESTION_MODEL_PECO,
-                'task_type': TASK_TYPE_OBSERVATION_TIME,
+                'task_type': TASK_TYPE_OBSERVATION_COMPARISON,
                 'description': '暴露与结局关联分析，有对照组',
                 'example': '(1) 在吸烟成人群体中，相比不吸烟者，冠心病发生率是否增加;(2)孕妇孕期暴露于高浓度空气污染环境中，与低出生体重发生是否相关;',
                 'elements': [
@@ -276,7 +276,6 @@ class DB:
 
                 for element in framework['elements']:
                     cur.execute(insert_framework_element_query, (framework_id, element['label'], element['order'], element['description']))  
-        self.commit()
 
     def get_all_frameworks(self) -> List[Dict]:
         search_query = "SELECT * FROM framework ORDER BY id"
@@ -295,7 +294,6 @@ class DB:
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (framework_id,))
             result = cur.fetchall()
-        self.commit()
         return [dict(row) for row in result] if result else []
 
     def get_framework_element_by_label(self, framework_label: str, element_label: str) -> Optional[Dict]:
@@ -316,21 +314,26 @@ class DB:
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (label,))
             row = cur.fetchone()
-        self.commit()
         return dict(row) if row else None
     
-    def insert_question_source(self, source_label: str, research_type: str, grade: str, title: str, abstract: str, source_id: Optional[str] = None) -> Optional[int]:
+    def get_framework_by_id(self, framework_id: int) -> Optional[Dict]:
+        search_query = "SELECT * FROM framework WHERE id = %s"
+        with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(search_query, (framework_id,))
+            row = cur.fetchone()
+        return dict(row) if row else None
+    
+    def insert_question_source(self, source_label: str, research_type: str, task_type: str, grade: str, title: str, abstract: str, source_id: Optional[str] = None) -> Optional[int]:
         insert_query = """
                     INSERT INTO question_source 
-                    (source_label, source_id, research_type, grade, title, abstract)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    (source_label, source_id, research_type, task_type, grade, title, abstract)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (source_label, title) DO NOTHING
                     RETURNING id
                     """
         with self.connection.cursor() as cur:
-            cur.execute(insert_query, (source_label, source_id, research_type, grade, title, abstract))
+            cur.execute(insert_query, (source_label, source_id, research_type, task_type, grade, title, abstract))
             result = cur.fetchone()
-        self.commit()
         return result[0] if result else None
 
     def get_question_source_by_id(self, question_source_id: int) -> Optional[Dict]:
@@ -338,7 +341,6 @@ class DB:
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (question_source_id,))
             row = cur.fetchone()
-        self.commit()
         return dict(row) if row else None
 
     def get_question_source_by_title(self, source_label: str, title: str) -> Optional[Dict]:
@@ -346,7 +348,6 @@ class DB:
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (source_label, title))
             row = cur.fetchone()
-        self.commit()
         return dict(row) if row else None
     
     def insert_question(self, question_source_id: int, framework_id: int, embedding: Optional[List[float]] = None) -> Optional[int]:
@@ -368,7 +369,6 @@ class DB:
                 """
             with self.connection.cursor() as cur:
                 cur.execute(update_query, (embedding, result))
-        self.commit()
         return result if result else None
 
     def get_question_by_id(self, question_source_id: int) -> Optional[List[Dict]]:
@@ -376,7 +376,6 @@ class DB:
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (question_source_id,))
             result = cur.fetchall()
-        self.commit()
         return [dict(row) for row in result] if result else None
 
     def insert_question_element(self, question_id: int, framework_element_id: int, question_element_label: str) -> None:
@@ -391,7 +390,6 @@ class DB:
         with self.connection.cursor() as cur:
             cur.execute(insert_query, (question_id, framework_element_id, question_element_label))
             result = cur.fetchone()
-        self.commit()
         return result[0] if result else None
 
     def get_question_elements_by_question_id(self, question_id: int) -> Optional[List[Dict]]:
@@ -408,7 +406,6 @@ class DB:
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(search_query, (question_id,))
             result = cur.fetchall()
-        self.commit()
         return [dict(row) for row in result] if result else None
 
     def get_statistics(self) -> Dict:
@@ -442,6 +439,4 @@ class DB:
                 """
             )
             stats['by_framework'] = {row['label']: row['count'] for row in cur.fetchall()}
-            
-        self.commit()
         return stats

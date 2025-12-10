@@ -23,120 +23,120 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
-api_key = "sk-KaZVAPnsPr2oVbLq17511e02E979454bBd43E0B07b18344f"
-base_url = "https://api.pumpkinaigc.online/v1"
-llm = ChatOpenAI(api_key=api_key, base_url=base_url, model="gpt-4.1")
+# api_key = "sk-KaZVAPnsPr2oVbLq17511e02E979454bBd43E0B07b18344f"
+# base_url = "https://api.pumpkinaigc.online/v1"
+# llm = ChatOpenAI(api_key=api_key, base_url=base_url, model="gpt-4.1")
 
 
 # 1.抽取PICO元素（使用结构化输出）
-class PICOModel(BaseModel):
-    """PICO模型：临床研究问题框架"""
+# class PICOModel(BaseModel):
+#     """PICO模型：临床研究问题框架"""
 
-    P: str = Field(default="", description="Population - 研究人群")
-    I: str = Field(default="", description="Intervention - 干预措施")
-    C: str = Field(default="", description="Comparison - 对照组")
-    O: str = Field(default="", description="Outcome - 结局指标")
+#     P: str = Field(default="", description="Population - 研究人群")
+#     I: str = Field(default="", description="Intervention - 干预措施")
+#     C: str = Field(default="", description="Comparison - 对照组")
+#     O: str = Field(default="", description="Outcome - 结局指标")
 
 
-def extract_pico(text):
-    structured_llm = llm.with_structured_output(PICOModel)
+# def extract_pico(text):
+#     structured_llm = llm.with_structured_output(PICOModel)
 
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                "你是临床研究专家。从文本中提取PICO要素（Population、Intervention、Comparison、Outcome）。如果某个元素不存在，留空。",
-            ),
-            ("user", "文本知识：{text}"),
-        ]
-    )
+#     prompt = ChatPromptTemplate.from_messages(
+#         [
+#             (
+#                 "system",
+#                 "你是临床研究专家。从文本中提取PICO要素（Population、Intervention、Comparison、Outcome）。如果某个元素不存在，留空。",
+#             ),
+#             ("user", "文本知识：{text}"),
+#         ]
+#     )
 
-    chain = prompt | structured_llm
-    result = chain.invoke({"text": text})
+#     chain = prompt | structured_llm
+#     result = chain.invoke({"text": text})
 
-    return result.model_dump()
+#     return result.model_dump()
 
 
 # 2.基于Langchain的PubMedRetriever检索临床研究领域文献,抽取摘要中的PICO，将其写入PICO知识库
-def search(keyword, max_res_count):
-    while True:
-        try:
-            time.sleep(0.2)
-            handle = Entrez.esearch(db="pubmed", term=keyword, retmax=max_res_count)
-            record = Entrez.read(handle)
-            return record["IdList"]
-        except Exception as e:
-            print("search error:", e)
-            time.sleep(2)
+# def search(keyword, max_res_count):
+#     while True:
+#         try:
+#             time.sleep(0.2)
+#             handle = Entrez.esearch(db="pubmed", term=keyword, retmax=max_res_count)
+#             record = Entrez.read(handle)
+#             return record["IdList"]
+#         except Exception as e:
+#             print("search error:", e)
+#             time.sleep(2)
 
 
-def fetch(pmid):
-    while True:
-        try:
-            time.sleep(0.2)
-            handle = Entrez.efetch(db="pubmed", id=pmid, rettype="abstract", retmode="xml")
-            xml_data = handle.read()
+# def fetch(pmid):
+#     while True:
+#         try:
+#             time.sleep(0.2)
+#             handle = Entrez.efetch(db="pubmed", id=pmid, rettype="abstract", retmode="xml")
+#             xml_data = handle.read()
 
-            root = ET.fromstring(xml_data)
-            abstract_text = ""
-            for abstract in root.findall(".//Abstract"):
-                for abstract_text_elem in abstract.findall("AbstractText"):
-                    abstract_text += abstract_text_elem.text
-            clean_abstract = re.sub(r"[\n\r\t]", "", abstract_text)
-            return clean_abstract.strip() or "No abstract available."
+#             root = ET.fromstring(xml_data)
+#             abstract_text = ""
+#             for abstract in root.findall(".//Abstract"):
+#                 for abstract_text_elem in abstract.findall("AbstractText"):
+#                     abstract_text += abstract_text_elem.text
+#             clean_abstract = re.sub(r"[\n\r\t]", "", abstract_text)
+#             return clean_abstract.strip() or "No abstract available."
 
-        except Exception as e:
-            print("fetch error:", e)
-            time.sleep(2)
+#         except Exception as e:
+#             print("fetch error:", e)
+#             time.sleep(2)
 
 
-pmids = search("clinical trials", 10)
-abstracts = []
-for pmid in pmids:
-    abs_text = fetch(pmid)
-    abstracts.append({pmid: abs_text})
-print("成功获取摘要数量:", len(abstracts))
-print(abstracts[:1])
+# pmids = search("clinical trials", 10)
+# abstracts = []
+# for pmid in pmids:
+#     abs_text = fetch(pmid)
+#     abstracts.append({pmid: abs_text})
+# print("成功获取摘要数量:", len(abstracts))
+# print(abstracts[:1])
 
-knowledge_base = []
-for item in abstracts:
-    for pmid, abstract in item.items():
-        pico_entry = {
-            **extract_pico(abstract),
-            "id": len(knowledge_base) + 1,
-            "pmid": pmid,
-            "abstract": abstract,
-        }
-        knowledge_base.append(pico_entry)
+# knowledge_base = []
+# for item in abstracts:
+#     for pmid, abstract in item.items():
+#         pico_entry = {
+#             **extract_pico(abstract),
+#             "id": len(knowledge_base) + 1,
+#             "pmid": pmid,
+#             "abstract": abstract,
+#         }
+#         knowledge_base.append(pico_entry)
 
-df = pd.DataFrame(knowledge_base)
-df.head()
-df.to_csv("pico_knowledge_base.csv", index=False)
+# df = pd.DataFrame(knowledge_base)
+# df.head()
+# df.to_csv("pico_knowledge_base.csv", index=False)
 
-with open("pico_knowledge_base.json", "w", encoding="utf-8") as f:
-    for item in knowledge_base:
-        f.write(json.dumps(item, ensure_ascii=False) + "\n")
+# with open("pico_knowledge_base.json", "w", encoding="utf-8") as f:
+#     for item in knowledge_base:
+#         f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
 # 3.向量化PICO知识库
 # model = SentenceTransformer('BAAI/bge-small-en-v1.5')
-embedding_model = HuggingFaceEmbeddings(
-    model_name="BAAI/bge-small-en-v1.5",
-    model_kwargs={"device": "cpu"},
-    encode_kwargs={"normalize_embeddings": True},
-)
-docs = []
-for record in knowledge_base:
-    meta = {"pmid": record.get("pmid")}
-    text = f"""
-                PMID: {record.get("pmid")};
-                P: {record.get("P")};
-                I: {record.get("I")};
-                C: {record.get("C")};
-                O: {record.get("O")};
-                """
-    clean_text = re.sub(r"[\n\r\t]", "", text).strip()
-    print(clean_text)
-    docs.append(Document(page_content=clean_text, metadata=meta))
+# embedding_model = HuggingFaceEmbeddings(
+#     model_name="BAAI/bge-small-en-v1.5",
+#     model_kwargs={"device": "cpu"},
+#     encode_kwargs={"normalize_embeddings": True},
+# )
+# docs = []
+# for record in knowledge_base:
+#     meta = {"pmid": record.get("pmid")}
+#     text = f"""
+#                 PMID: {record.get("pmid")};
+#                 P: {record.get("P")};
+#                 I: {record.get("I")};
+#                 C: {record.get("C")};
+#                 O: {record.get("O")};
+#                 """
+#     clean_text = re.sub(r"[\n\r\t]", "", text).strip()
+#     print(clean_text)
+#     docs.append(Document(page_content=clean_text, metadata=meta))
 faiss_index = FAISS.from_documents(docs, embedding_model)
 retriever = faiss_index.as_retriever(search_kwargs={"k": 2})
 
