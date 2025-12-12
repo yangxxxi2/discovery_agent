@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List
 from .question_model_extractor import QuestionModelExtractor
 from storage.db import DB
 from .llm import llm
@@ -39,7 +39,7 @@ class ResearchQuestionAnalogicalAugmenter:
         print("所有位置均已填充")
         return True
     
-    def generate_variant_models_by_extend_filled_slot(self, pending_model: dict) -> List[dict]:
+    def generate_variant_models_by_extend_filled_slots(self, pending_model: dict) -> List[dict]:
         """
         通过扩展已填充槽位生成平行模型
         
@@ -75,8 +75,8 @@ class ResearchQuestionAnalogicalAugmenter:
             result = result.content if hasattr(result, 'content') else json.loads(str(result))
      
             for slot_name, variant_list in result.items():
-                if slot_name in filled_slots and variant_list:
-                    for variant_value in variant_list[:2]:
+                if slot_name in filled_slots:
+                    for variant_value in variant_list:
                         variant_model = base_model.copy()
                         variant_model[slot_name] = variant_value
                         parallel_models.append(variant_model)
@@ -88,7 +88,7 @@ class ResearchQuestionAnalogicalAugmenter:
             print(f"生成槽位变体时出错: {e}")
             return parallel_models
 
-    def retrieve_related_evidence_based_variant_models(self, variant_models: List[dict], db: DB, top_k: int, distance_threshold: float) -> List[dict]:
+    def retrieve_related_evidence_by_variant_models(self, variant_models: List[dict], db: DB, top_k: int, distance_threshold: float) -> List[dict]:
         """
         基于平行模型检索相关证据 (RAG检索)
         
@@ -150,7 +150,13 @@ class ResearchQuestionAnalogicalAugmenter:
         print(f"✓ RAG检索完成：从 {len(variant_models)} 个平行模型中检索到 {len(unique_evidence)} 条独特证据")
         return unique_evidence[:top_k]
 
+    def fill_pending_model_by_compose_evidence_components(self, evidence: List[dict]) -> dict:
+       #TODO:识别unfilled slots；从evidence提取相应slot对应的component，并构建pool；智能采样组合，填充pending model
+        pass
+
     def augment_candidate_models_by_analogical_generation(self, pending_model: dict, evidence: List[dict]) -> List[dict]:
+        #TODO：gap模板驱动的举一反三式生成
+        #构建受控算子库；对每个composed model识别gap，计算gap score；重复的研究则进行受控调整，新颖的研究则保留
         """
         生成完整模型 - 通过举一反三补全未填充槽位
         
@@ -161,6 +167,7 @@ class ResearchQuestionAnalogicalAugmenter:
         - Gap识别：哪些组合还没有被研究？
         - 创新生成：提出有价值的新组合
         """
+
 
         fromatted_prompt = EXTEND_FILLED_SLOTS_PROMPT.format()
         try:
