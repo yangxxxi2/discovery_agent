@@ -57,9 +57,12 @@ class KnowledgeBaseConstructor:
             return []
 
     def _parse_abstract(self, abstract: Dict, db: DB) -> Dict:
-        task_type = self.extractor.determine_task_type(abstract)
-        question_model = self.extractor.extract_question_model(abstract, task_type, db) if task_type != None else {}
-        research_type = self.extractor.extract_research_type(abstract) if task_type != None else ""
+        title = abstract.get("title", "")
+        abstract_text = abstract.get("abstract", "")
+        text = "title: " + title + "\nabstract: " + abstract_text
+        task_type = self.extractor.determine_task_type(text)
+        question_model = self.extractor.extract_question_model(text, task_type, db) if task_type != None else {}
+        research_type = self.extractor.extract_research_type(text) if task_type != None else ""
         embedded_model = self.extractor.embed_question_model(question_model) if question_model != {} else []
         parsed_abstract = {
                 **question_model,

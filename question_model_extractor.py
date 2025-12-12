@@ -10,12 +10,9 @@ import numpy as np
 
 class QuestionModelExtractor:
 
-    def determine_task_type(self, abstract: dict) -> str:
+    def determine_task_type(self, text: str) -> str:
         try:
-            title = abstract.get("title", "")
-            abstract_text = abstract.get("abstract", "")
-            formatted_prompt = DETERMINE_TASK_TYPE_PROMPT.format(title=title, abstract=abstract_text)
-            
+            formatted_prompt = DETERMINE_TASK_TYPE_PROMPT.format(text=text)
             result = llm.invoke(formatted_prompt)
             result_text = result.content if hasattr(result, 'content') else str(result)
             valid_types = list(TASK_TO_MODEL_MAP.keys())
@@ -49,8 +46,7 @@ class QuestionModelExtractor:
             abstract = abstract.get("abstract", "")
             formatted_prompt = EXTRACT_QUESTION_MODEL_PROMPT.format(
                 model_type=model_type, 
-                title=title, 
-                abstract=abstract, 
+                text="title: " + title + "\nabstract: " + abstract,
                 components_info=components_info, 
                 example_format=example_format, 
                 model_description=model.get("description", ""), 
@@ -72,7 +68,7 @@ class QuestionModelExtractor:
         try:
             title = abstract.get("title", "")
             abstract_text = abstract.get("abstract", "")
-            formatted_prompt = EXTRACT_RESEARCH_TYPE_PROMPT.format(title=title, abstract=abstract_text)
+            formatted_prompt = EXTRACT_RESEARCH_TYPE_PROMPT.format(text="title: " + title + "\nabstract: " + abstract_text)
 
             result = llm.invoke(formatted_prompt)
             result_text = result.content if hasattr(result, 'content') else str(result)

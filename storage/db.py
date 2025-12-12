@@ -23,6 +23,8 @@ from ..constants import (
     QUESTION_MODEL_SPICE,
     QUESTION_MODEL_ECLIPSe,
 )
+import numpy as np
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -66,7 +68,7 @@ class DB:
         CREATE TABLE IF NOT EXISTS framework (
             id                      SERIAL PRIMARY KEY,
             label                   VARCHAR(50) UNIQUE NOT NULL,
-            task_type           VARCHAR(100) NOT NULL,
+            task_type               VARCHAR(100) NOT NULL,
             description             TEXT,
             example                 TEXT,
             CONSTRAINT unique_framework UNIQUE(label)
@@ -440,3 +442,46 @@ class DB:
             )
             stats['by_framework'] = {row['label']: row['count'] for row in cur.fetchall()}
         return stats
+
+    def search_similar_questions(self, model_embedding: np.ndarray, limit: int, distance_threshold: float) -> List[Dict]:
+        """
+        RAG 核心方法：基于向量相似度搜索相关研究问题
+        
+        Args:
+            query_embedding: 查询向量 (1536维)
+            limit: 返回结果数量
+            distance_threshold: 距离阈值，只返回距离小于此值的结果
+        
+        Returns:
+            相似问题列表，按相似度排序，包含 distance（越小越相似）
+            
+        Note:
+            使用余弦距离 (<=>)，距离范围 [0, 2]
+            - 0 表示完全相同
+            - 1 表示正交（无关）
+            - 2 表示完全相反
+        """
+        try:
+            embedding_str = str(model_embedding)
+            search_query = """
+                SELECT 
+                    q.id,
+                    q.question_source_id,
+                    q.framework_id,
+                    q.embedding <=> %s::vector AS distance
+                FROM question q
+                WHERE q.embedding IS NOT NULL
+                    AND q.embedding <=> %s::vector < %s
+                ORDER BY q.embedding <=> %s::vector
+                LIMIT %s
+            """
+            params = (embedding_str, embedding_str, distance_threshold, embedding_str, limit)
+            with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(search_query, params)
+                results = cur.fetchall()
+            
+            return [dict(row) for row in results] if results else []
+            
+        except Exception as e:
+            logger.error(f"向量相似度搜索失败: {e}")
+            return []
